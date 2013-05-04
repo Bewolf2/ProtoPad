@@ -5,10 +5,12 @@ using ActiproSoftware.Text.Utility;
 
 namespace ProtoPad_Client
 {
+#if USE_INDICATOR
     public class ErrorIndicatorTagger : IndicatorClassificationTaggerBase<ErrorIndicatorTag> 
     {
         public ErrorIndicatorTagger(ICodeDocument document) : base("CustomIndicator", new[] { 
 				new Ordering(TaggerKeys.Token, OrderPlacement.Before)
 			}, document, true) {}
     }
+#endif
 }

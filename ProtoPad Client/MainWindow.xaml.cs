@@ -303,7 +303,9 @@ namespace ProtoPad_Client
 
             compilerParameters.GenerateExecutable = false;
             var compileResults = cpd.CompileAssemblyFromSource(compilerParameters, sourceCode);
+#if USE_INDICATOR
             CodeEditor.Document.IndicatorManager.Clear<ErrorIndicatorTagger, ErrorIndicatorTag>();
+#endif
             var errorStringBuilder = new StringBuilder();
             foreach (CompilerError error in compileResults.Errors)
             {
@@ -322,8 +324,11 @@ namespace ProtoPad_Client
             var editorLine = CodeEditor.ActiveView.CurrentSnapshot.Lines[codeLineNumber];
             CodeEditor.ActiveView.Selection.StartOffset = editorLine.StartOffset;
             CodeEditor.ActiveView.Selection.SelectToLineEnd();
+#if USE_INDICATOR
             var tag = new ErrorIndicatorTag { ContentProvider = new PlainTextContentProvider(errorMessage) };
             CodeEditor.Document.IndicatorManager.Add<ErrorIndicatorTagger, ErrorIndicatorTag>(CodeEditor.ActiveView.Selection.SnapshotRange, tag);
+#endif
+
         }
 
         private void UpdateCodeTypesComboBox()
@@ -488,7 +493,9 @@ namespace ProtoPad_Client
             }
 
             CodeEditor.Document.Language = language;
+#if USE_INDICATOR
             CodeEditor.Document.Language.RegisterService(new IndicatorQuickInfoProvider());
+#endif
         }
 
         private void UpdateAssemblyReferences()

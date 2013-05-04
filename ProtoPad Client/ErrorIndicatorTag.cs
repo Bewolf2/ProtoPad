@@ -13,6 +13,7 @@ using ActiproSoftware.Windows.Controls.SyntaxEditor.Highlighting.Implementation;
 
 namespace ProtoPad_Client
 {
+#if USE_INDICATOR
     public class ErrorIndicatorTag : IndicatorClassificationTagBase
     {
         private static readonly IClassificationType CustomIndicatorClassificationType = new ClassificationType("Custom Indicator");
@@ -54,5 +55,7 @@ namespace ProtoPad_Client
 			grid.Children.Add(outerBorder);
 			return grid;
 		}
+
     }
+#endif
 }

@@ -27,7 +27,9 @@
                 <Button x:Name="AboutHelpButton" Content="About/help" Height="31" VerticalAlignment="Top" Width="83" Click="AboutHelpButton_Click" ToolTip="Instructions and information about the app author and leveraged components."/>
 
             </ToolBar>
-            <syntaxeditor:SyntaxEditor DockPanel.Dock="Bottom" x:Name="CodeEditor" IsIndicatorMarginVisible="True">
+            
+            <!--<syntaxeditor:SyntaxEditor DockPanel.Dock="Bottom" x:Name="CodeEditor" IsIndicatorMarginVisible="True">-->
+            <syntaxeditor:SyntaxEditor DockPanel.Dock="Bottom" x:Name="CodeEditor">
                 <syntaxeditor:EditorDocument xml:space="preserve"></syntaxeditor:EditorDocument>
             </syntaxeditor:SyntaxEditor>
         </DockPanel>
