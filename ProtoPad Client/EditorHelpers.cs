@@ -169,8 +169,15 @@ namespace ProtoPad_Client
                     break;
                 case MainWindow.CodeTypes.Program:
                     break;
+              
             }
+            
+            wrapText = wrapText.Replace("__USINGS__", GetDefaultUsingStatements(deviceType) + (extraUsingStatements == null ? "" : String.Join("\r\n", extraUsingStatements)));
+            return wrapText + WrapTextDumpHelpers;
+        }
 
+        public static string GetDefaultUsingStatements(MainWindow.DeviceTypes deviceType)
+        {
             var usingStatements = "";
             switch (deviceType)
             {
@@ -184,8 +191,7 @@ namespace ProtoPad_Client
                     usingStatements = DefaultUsingStatements_RegularDotNet;
                     break;
             }
-            wrapText = wrapText.Replace("__USINGS__", usingStatements + (extraUsingStatements == null ? "" : String.Join("\r\n", extraUsingStatements)));
-            return wrapText + WrapTextDumpHelpers;
+            return usingStatements;
         }
 
         public static string GetDefaultCode(MainWindow.CodeTypes codeType, MainWindow.DeviceTypes deviceType)
@@ -207,12 +213,17 @@ namespace ProtoPad_Client
             switch (codeType)
             {
                 case MainWindow.CodeTypes.Program:
+                
                     sampleStatements = sampleStatements.Replace("\n", "\n\t");
                     return @"void Main(" + GetDeviceSpecificMainParams(deviceType) + @")
 {
     " + sampleStatements + @"
-}
-
+}";
+                case MainWindow.CodeTypes.Source:
+                    return @"public void Main(" + GetDeviceSpecificMainParams(deviceType) + @")
+    {
+    
+    }";
 // Define other methods and classes here";
                 case MainWindow.CodeTypes.Expression:
                     return "";
