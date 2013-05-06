@@ -2,6 +2,7 @@
 using System.CodeDom.Compiler;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -27,15 +28,16 @@ using Microsoft.CSharp;
 using ServiceDiscovery;
 using mshtml;
 
+using StumDE.Misc;
+
 namespace ProtoPad_Client
 {
-    public partial class MainWindow : INotifyPropertyChanged
-    {
+    public partial class MainWindow : INotifyPropertyChanged {
         private IHTMLElement _htmlHolder;
         private IHTMLWindow2 _htmlWindow;
         private string _currentWrapText;
         private IProjectAssembly _projectAssembly;
-        
+
         private List<string> _referencedAssemblies = new List<string>();
         private string _msCorLib;
 
@@ -43,6 +45,7 @@ namespace ProtoPad_Client
         private DeviceItem _currentDevice;
 
         private string _defaultUsingStatements;
+
         public string DefaultUsingStatements {
             get { return _defaultUsingStatements; }
             set {
@@ -54,25 +57,26 @@ namespace ProtoPad_Client
         }
 
         private string _extraUsingStatements;
-        public string ExtraUsingStatements
-        {
+
+        public string ExtraUsingStatements {
             get { return _extraUsingStatements; }
-            set
-            {
-                if (value != _extraUsingStatements)
-                {
+            set {
+                if (value != _extraUsingStatements) {
                     _extraUsingStatements = value;
                     OnPropertyChanged("ExtraUsingStatements");
-                    _currentWrapText = EditorHelpers.GetWrapText(_currentCodeType.CodeType, _currentDevice.DeviceType, ExtraUsingStatementsList);
+                    _currentWrapText = EditorHelpers.GetWrapText(_currentCodeType.CodeType, _currentDevice.DeviceType,
+                                                                 ExtraUsingStatementsList);
                     CodeEditor.Document.SetHeaderAndFooterText(WrapHeader, WrapFooter);
                 }
             }
         }
 
-        private List<string> ExtraUsingStatementsList 
-        {
+        private List<string> ExtraUsingStatementsList {
             get {
-                var extras = _extraUsingStatements == null || _extraUsingStatements.Trim() == ""? new List<string>():_extraUsingStatements.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).ToList();
+                var extras = _extraUsingStatements == null || _extraUsingStatements.Trim() == ""
+                                 ? new List<string>()
+                                 : _extraUsingStatements.Split(new[] {Environment.NewLine},
+                                                               StringSplitOptions.RemoveEmptyEntries).ToList();
                 var isPixate = _currentDevice.PixateCssPaths != null;
                 var pixate = "using PixateLib;";
                 if (isPixate && !extras.Contains(pixate)) {
@@ -87,66 +91,37 @@ namespace ProtoPad_Client
             }
         }
 
-        private string _extraSourceFiles;
-        public string ExtraSourceFiles {
-            get { return _extraSourceFiles; }
-            set {
-                if (value != _extraSourceFiles) {
+        private bool SourceMode {
+            get { return _currentCodeType.CodeType == CodeTypes.Source; }
+        }
 
-                    _extraSourceFilesList.Clear(); 
-                    
-                    _extraSourceFiles = value;
-                    if (_extraSourceFiles == null || _extraSourceFiles.Trim() == "") return;
-                    
-                    var files = _extraSourceFiles.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).ToList();
-                    foreach (var file in files) {
-                        if (Directory.Exists(file)) {
-                            foreach (var fileName in Directory.EnumerateFiles(file, "*.*", SearchOption.AllDirectories).Where(s=> Path.GetExtension(s).ToLower() == ".cs")) 
-                                if (!_extraSourceFilesList.Contains(fileName)) _extraSourceFilesList.Add(fileName);
-                        } else if (File.Exists(file)) {
-                            if (!_extraSourceFilesList.Contains(file)) _extraSourceFilesList.Add(file);
-                        }
-                    }
+        private bool LocalMode {
+            get { return _currentDevice.DeviceType == DeviceTypes.Local; }
+        }
 
-                    var sb = new StringBuilder();
-                    _extraSourceFilesList.ForEach((s) => { sb.Append(s).Append(Environment.NewLine); });
-                    _extraSourceFiles = sb.ToString();
-                    OnPropertyChanged("ExtraSourceFiles");
-
-                    CompileAllAndAddReferences();
-                }
+        private string WrapHeader {
+            get {
+                return
+                    _currentWrapText.Split(new[] {EditorHelpers.CodeTemplateStatementsPlaceHolder},
+                                           StringSplitOptions.None)[0];
             }
         }
 
-        private void CompileAllAndAddReferences() {
-            var ifWrapDefaultCode = _currentCodeType.CodeType != CodeTypes.Source;
-            var assembly = CompileSource(ifWrapDefaultCode);
-            if (assembly != null) {
-                _projectAssembly.AssemblyReferences.AddFrom(assembly);
+        private string WrapFooter {
+            get {
+                return
+                    _currentWrapText.Split(new[] {EditorHelpers.CodeTemplateStatementsPlaceHolder},
+                                           StringSplitOptions.None)[1];
             }
         }
 
-        private List<string> _extraSourceFilesList = new List<string>();
-
-        private bool SourceMode { get {return _currentCodeType.CodeType == CodeTypes.Source;} }
-
-        private bool LocalMode { get {return _currentDevice.DeviceType == DeviceTypes.Local;} }
-
-        private string WrapHeader
-        {
-            get { return _currentWrapText.Split(new[] { EditorHelpers.CodeTemplateStatementsPlaceHolder }, StringSplitOptions.None)[0]; }
-        }
-        private string WrapFooter
-        {
-            get { return _currentWrapText.Split(new[] { EditorHelpers.CodeTemplateStatementsPlaceHolder }, StringSplitOptions.None)[1]; }
+        public enum DeviceTypes {
+            Android,
+            iOS,
+            Local
         }
 
-       
-
-        public enum DeviceTypes {Android, iOS, Local}
-
-        public class DeviceItem
-        {
+        public class DeviceItem {
             public string DeviceName { get; set; }
             public string DeviceAddress { get; set; }
             public string MainXamarinAssemblyName { get; set; }
@@ -155,34 +130,33 @@ namespace ProtoPad_Client
             public DeviceTypes DeviceType;
         }
 
-        public enum CodeTypes
-        {
-            Expression, Statements, Program, PixateCssFile,
+        public enum CodeTypes {
+            Expression,
+            Statements,
+            Program,
+            PixateCssFile,
             Source
         }
 
-        private readonly List<CodeTypeItem> _defaultCodeTypeItems; 
-        public class CodeTypeItem
-        {
+        private readonly List<CodeTypeItem> _defaultCodeTypeItems;
+
+        public class CodeTypeItem {
             public string DisplayName { get; set; }
             public CodeTypes CodeType;
             public string EditFilePath;
         }
 
-        public MainWindow()
-        {
+        public MainWindow() {
             InitializeComponent();
 
-            _defaultCodeTypeItems = new List<CodeTypeItem>
-                {
-                    new CodeTypeItem {DisplayName = "C# Expresssion", CodeType = CodeTypes.Expression},
-                    new CodeTypeItem {DisplayName = "C# Statements", CodeType = CodeTypes.Statements},
-                    new CodeTypeItem {DisplayName = "C# Program", CodeType = CodeTypes.Program},
-                    new CodeTypeItem {DisplayName = "C# Source", CodeType = CodeTypes.Source},
-                };
+            _defaultCodeTypeItems = new List<CodeTypeItem> {
+                new CodeTypeItem {DisplayName = "C# Expresssion", CodeType = CodeTypes.Expression},
+                new CodeTypeItem {DisplayName = "C# Statements", CodeType = CodeTypes.Statements},
+                new CodeTypeItem {DisplayName = "C# Program", CodeType = CodeTypes.Program},
+                new CodeTypeItem {DisplayName = "C# Source", CodeType = CodeTypes.Source},
+            };
 
-            _currentDevice = new DeviceItem
-            {
+            _currentDevice = new DeviceItem {
                 DeviceAddress = "__LOCAL__",
                 DeviceType = DeviceTypes.Local,
                 DeviceName = "Local"
@@ -193,76 +167,74 @@ namespace ProtoPad_Client
         #region Event handlers
 
 
-        private void Window_Loaded(object sender, RoutedEventArgs e)
-        {
+        private void Window_Loaded(object sender, RoutedEventArgs e) {
             UpdateSendButtons();
             InitializeEditor();
             ConnectToApp(_currentDevice);
             InitializeResultWindow();
+            InitializeProjectList();
         }
 
-       
+
 
         private void SendCodeButton_Click(object sender, RoutedEventArgs e) {
-            
-            var wrapDefault = !SourceMode ;
+
+            var wrapDefault = !SourceMode;
             var result = SendCode(_currentDevice.DeviceAddress, wrapDefault);
             if (result == null) return;
             var errorMessage = result.ErrorMessage;
-            if (!String.IsNullOrWhiteSpace(errorMessage))
-            {
-                if (errorMessage.StartsWith("___EXCEPTION_____At offset: "))
-                {
+            if (!String.IsNullOrWhiteSpace(errorMessage)) {
+                if (errorMessage.StartsWith("___EXCEPTION_____At offset: ")) {
                     var exceptionBody = errorMessage.Substring("___EXCEPTION_____At offset: ".Length);
                     var exceptionParts = exceptionBody.Split(new[] {"__"}, StringSplitOptions.None);
                     var codeOffset = int.Parse(exceptionParts[0]) - 1;
 
                     var position = CodeEditor.Document.CurrentSnapshot.OffsetToPosition(codeOffset);
 
-                    ShowLineError(position.Line+1, exceptionParts[1]);
+                    ShowLineError(position.Line + 1, exceptionParts[1]);
                 }
                 LogToResultsWindow(errorMessage);
-            }
-            else if (result.Results != null)
-            {
-                _htmlHolder.innerHTML = String.Join("", result.Results.Select(r => "<h1>" + r.ResultKey + "</h1>" + DumpToXhtml.Dump(r.ResultValue, 0).ToString()));
+            } else if (result.Results != null) {
+                _htmlHolder.innerHTML = String.Join("",
+                                                    result.Results.Select(
+                                                        r =>
+                                                        "<h1>" + r.ResultKey + "</h1>" +
+                                                        DumpToXhtml.Dump(r.ResultValue, 0).ToString()));
                 _htmlWindow.execScript("Update();", "javascript");
             }
         }
 
-        private void SendCssButton_Click(object sender, RoutedEventArgs e)
-        {
+        private void SendCssButton_Click(object sender, RoutedEventArgs e) {
             var cssText = CodeEditor.Document.CurrentSnapshot.Text;
             var cssData = Encoding.UTF8.GetBytes(cssText);
             var cssFilePathData = Encoding.UTF8.GetBytes(_currentCodeType.EditFilePath);
             var requestLength = 2 + cssFilePathData.Length + cssData.Length;
             var requestData = new byte[requestLength];
-            var cssFilePathDataLength = (ushort)(cssFilePathData.Length);
-            requestData[0] = (byte)(cssFilePathDataLength >> 8);
-            requestData[1] = (byte)cssFilePathDataLength;
+            var cssFilePathDataLength = (ushort) (cssFilePathData.Length);
+            requestData[0] = (byte) (cssFilePathDataLength >> 8);
+            requestData[1] = (byte) cssFilePathDataLength;
             Array.Copy(cssFilePathData, 0, requestData, 2, cssFilePathDataLength);
             Array.Copy(cssData, 0, requestData, 2 + cssFilePathDataLength, cssData.Length);
             SimpleHttpServer.SendPostRequest(_currentDevice.DeviceAddress, requestData, "UpdatePixateCSS");
         }
 
-        private void LoadAssemblyButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentDevice == null)
-            {
+        private void LoadAssemblyButton_Click(object sender, RoutedEventArgs e) {
+            if (_currentDevice == null) {
                 MessageBox.Show("Please connect to an app first!");
                 return;
             }
-            var dlg = new Microsoft.Win32.OpenFileDialog { DefaultExt = ".dll|.exe" };
+            var dlg = new Microsoft.Win32.OpenFileDialog {DefaultExt = ".dll|.exe"};
 
             var frameworkReferenceAssembliesDirectory = Path.GetDirectoryName(_referencedAssemblies.First());
-            switch (_currentDevice.DeviceType)
-            {
+            switch (_currentDevice.DeviceType) {
                 case DeviceTypes.Android:
-                    dlg.Filter = "Xamarin.Android-compatible assembly (.dll)|*.dll|Xamarin.Android-compatible assembly (.exe)|*.exe";
+                    dlg.Filter =
+                        "Xamarin.Android-compatible assembly (.dll)|*.dll|Xamarin.Android-compatible assembly (.exe)|*.exe";
                     dlg.InitialDirectory = Path.Combine(frameworkReferenceAssembliesDirectory, "MonoAndroid");
                     break;
                 case DeviceTypes.iOS:
-                    dlg.Filter = "Xamarin.iOS-compatible assembly (.dll)|*.dll|Xamarin.iOS-compatible assembly (.exe)|*.exe";
+                    dlg.Filter =
+                        "Xamarin.iOS-compatible assembly (.dll)|*.dll|Xamarin.iOS-compatible assembly (.exe)|*.exe";
                     dlg.InitialDirectory = Path.Combine(frameworkReferenceAssembliesDirectory, @"MonoTouch\v4.0");
                     break;
                 case DeviceTypes.Local:
@@ -277,40 +249,46 @@ namespace ProtoPad_Client
             _projectAssembly.AssemblyReferences.AddFrom(assemblyPath);
             _referencedAssemblies.Add(assemblyPath);
             if (!LocalMode)
-                SimpleHttpServer.SendPostRequest(_currentDevice.DeviceAddress, File.ReadAllBytes(assemblyPath), "ExecuteAssembly");
+                SimpleHttpServer.SendPostRequest(_currentDevice.DeviceAddress, File.ReadAllBytes(assemblyPath),
+                                                 "ExecuteAssembly");
+
+            CompileAllAndAddReferences();
         }
 
-        private void CodeTypeComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
-        {
+        private void CodeTypeComboBox_SelectionChanged(object sender,
+                                                       System.Windows.Controls.SelectionChangedEventArgs e) {
             var newCodeType = CodeTypeComboBox.SelectedItem as CodeTypeItem;
-            if (newCodeType != _currentCodeType && newCodeType != null)
-            {
+            if (newCodeType != _currentCodeType && newCodeType != null) {
                 _currentCodeType = newCodeType;
                 SetText(true);
-                if (_extraSourceFilesList.Count > 0)
+
+                // Todo save cs or css files according _currentCodeType
+                if (_currentCodeType.CodeType != CodeTypes.PixateCssFile)
+                    SaveEditorSource();
+
+                if (newCodeType.CodeType != CodeTypes.PixateCssFile && _extraSourceFilesCollection.Count > 0)
                     CompileAllAndAddReferences();
             }
             UpdateSendButtons();
         }
 
-        private void ClearSimulatorWindowButton_Click(object sender, RoutedEventArgs e)
-        {
+        private void ClearSimulatorWindowButton_Click(object sender, RoutedEventArgs e) {
             var wrapText = EditorHelpers.GetWrapText(CodeTypes.Statements, _currentDevice.DeviceType, null);
-            var clearCode = wrapText.Replace("__STATEMENTSHERE__", _currentDevice.DeviceType == DeviceTypes.iOS ? EditorHelpers.ClearWindowStatements_iOS : EditorHelpers.ClearWindowStatements_Android);
-            SendCode(_currentDevice.DeviceAddress, false, clearCode);            
+            var clearCode = wrapText.Replace("__STATEMENTSHERE__",
+                                             _currentDevice.DeviceType == DeviceTypes.iOS
+                                                 ? EditorHelpers.ClearWindowStatements_iOS
+                                                 : EditorHelpers.ClearWindowStatements_Android);
+            SendCode(_currentDevice.DeviceAddress, false, clearCode);
         }
 
-        private void AboutHelpButton_Click(object sender, RoutedEventArgs e)
-        {
+        private void AboutHelpButton_Click(object sender, RoutedEventArgs e) {
             (new AboutWindow()).Show();
         }
 
-        private void ConnectButton_Click(object sender, RoutedEventArgs e)
-        {
+        private void ConnectButton_Click(object sender, RoutedEventArgs e) {
             var connectWindow = new ConnectWindow();
             var result = connectWindow.ShowDialog().Value;
-            if (result)
-            {
+            if (result) {
                 ConnectToApp(connectWindow.SelectedDeviceItem);
             }
         }
@@ -318,22 +296,28 @@ namespace ProtoPad_Client
         #endregion
 
 
-        private ExecuteResponse SendCode(string url, bool wrapWithDefaultCode = true, string specialNonEditorCode = null)
-        {
+        private ExecuteResponse SendCode(string url, bool wrapWithDefaultCode = true, string specialNonEditorCode = null) {
             var assemblyPath = CompileSource(wrapWithDefaultCode, specialNonEditorCode);
             if (String.IsNullOrWhiteSpace(assemblyPath)) return null;
-            if (_currentDevice.DeviceType == DeviceTypes.Local)
-            {
+            if (_currentDevice.DeviceType == DeviceTypes.Local) {
                 var executeResponse = EditorHelpers.ExecuteLoadedAssemblyString(File.ReadAllBytes(assemblyPath));
                 var dumpValues = executeResponse.GetDumpValues();
-                if (dumpValues != null)
-                {
-                    executeResponse.Results = dumpValues.Select(v => new ResultPair(v.Description, Dumper.ObjectToDumpValue(v.Value, v.Level, executeResponse.GetMaxEnumerableItemCount()))).ToList();
+                if (dumpValues != null) {
+                    executeResponse.Results =
+                        dumpValues.Select(
+                            v =>
+                            new ResultPair(v.Description,
+                                           Dumper.ObjectToDumpValue(v.Value, v.Level,
+                                                                    executeResponse.GetMaxEnumerableItemCount())))
+                                  .ToList();
                 }
                 return executeResponse;
             }
-            var responseString = SimpleHttpServer.SendPostRequest(url, File.ReadAllBytes(assemblyPath), "ExecuteAssembly").Trim();
-            return String.IsNullOrWhiteSpace(responseString) ? null : UtilityMethods.JsonDecode<ExecuteResponse>(responseString);
+            var responseString = SimpleHttpServer.SendPostRequest(url, File.ReadAllBytes(assemblyPath),
+                                                                  "ExecuteAssembly");
+            return String.IsNullOrWhiteSpace(responseString)
+                       ? null
+                       : UtilityMethods.JsonDecode<ExecuteResponse>(responseString.Trim());
         }
 
         /// <summary>
@@ -341,21 +325,16 @@ namespace ProtoPad_Client
         /// These will be used to insert special 'offset registration' statements
         /// Offset registrations are used to catch the location where runtime errors occur
         /// </summary>
-        private static bool VisitNodesAndSelectStatementOffsets(IAstNode node, ICollection<int> statementOffsets)
-        {
-            if (node.Value == "SimpleName: \"DumpHelpers\"" && node.Parent.Value == "ClassDeclaration")
-            {
+        private static bool VisitNodesAndSelectStatementOffsets(IAstNode node, ICollection<int> statementOffsets) {
+            if (node.Value == "SimpleName: \"DumpHelpers\"" && node.Parent.Value == "ClassDeclaration") {
                 return false;
             }
 
-            if (node is Statement && !(node is BlockStatement) && node.StartOffset.HasValue && node.StartOffset >= 0)
-            {
+            if (node is Statement && !(node is BlockStatement) && node.StartOffset.HasValue && node.StartOffset >= 0) {
                 var isDumpMethodStatement = false;
-                if (node.Parent != null && node.Parent.Parent != null)
-                {
+                if (node.Parent != null && node.Parent.Parent != null) {
                     var methodNode = node.Parent.Parent as MethodDeclaration;
-                    if (methodNode != null)
-                    {
+                    if (methodNode != null) {
                         if (methodNode.Name.Text == "____TrackStatementOffset") isDumpMethodStatement = true;
                     }
                 }
@@ -365,8 +344,7 @@ namespace ProtoPad_Client
             return node.Children.All(childNode => VisitNodesAndSelectStatementOffsets(childNode, statementOffsets));
         }
 
-        private string GetSourceWithOffsetRegistrationStatements()
-        {
+        private string GetSourceWithOffsetRegistrationStatements() {
             var parseData = CodeEditor.Document.ParseData as IDotNetParseData;
 
             var statementOffsets = new List<int>();
@@ -378,18 +356,19 @@ namespace ProtoPad_Client
             documentWithOffsets.SetText(parseData.Snapshot.Text);
 
 
-            var options = new TextChangeOptions { OffsetDelta = TextChangeOffsetDelta.SequentialOnly };
+            var options = new TextChangeOptions {OffsetDelta = TextChangeOffsetDelta.SequentialOnly};
             var change = documentWithOffsets.CreateTextChange(TextChangeTypes.Custom, options);
-            foreach (var insert in inserts)
-            {
+            foreach (var insert in inserts) {
                 change.InsertText(insert.Key, insert.Value);
             }
             change.Apply();
             return documentWithOffsets.Text;
         }
 
-        private string CompileSource(bool wrapWithDefaultCode, string specialNonEditorCode = null)
-        {
+        private string CompileSource(bool wrapWithDefaultCode, string specialNonEditorCode = null) {
+            if (_currentCodeType.CodeType == CodeTypes.PixateCssFile)
+                return null;
+
             var codeWithOffsets = (specialNonEditorCode ?? GetSourceWithOffsetRegistrationStatements()).Replace("void Main(", "public void Main(");
 
             var sourceCode = wrapWithDefaultCode ? String.Format("{0}{1}{2}", WrapHeader.Replace("void Main(", "public void Main("), codeWithOffsets, WrapFooter) : codeWithOffsets;
@@ -406,13 +385,36 @@ namespace ProtoPad_Client
 
             CompilerResults compileResults;
 
-            if (specialNonEditorCode != null || (!SourceMode && _extraSourceFilesList.Count == 0)) {
+            var addResultToReference = specialNonEditorCode != null && _extraSourceFilesCollection.Count > 0;
+
+            if (specialNonEditorCode != null) {
                 compileResults = cpd.CompileAssemblyFromSource(compilerParameters, sourceCode);
+                // compile extra source files for reference only
+                if (_extraSourceFilesCollection.Count > 0) {
+                    var result = CompileSource(false);
+                    if (result != null) {
+                        _projectAssembly.AssemblyReferences.AddFrom(result);
+                    }
+                }   
             } else {
-                var saved = SaveProtoPadSource();
-                if (!_extraSourceFilesList.Contains(saved))
-                    _extraSourceFilesList.Add(saved);
-                compileResults = cpd.CompileAssemblyFromFile(compilerParameters, _extraSourceFilesList.ToArray());
+
+                var saved = SaveEditorSource();
+                var existSaveds =
+                    _extraSourceFilesCollection.ToList()
+                                                .Where(
+                                                    s =>
+                                                    Path.GetFileNameWithoutExtension(s.FilePath) ==
+                                                    CodeEditor.Document.FileName);
+                foreach (var source in existSaveds)
+                {
+                    _extraSourceFilesCollection.Remove(source);
+                }
+                _extraSourceFilesCollection.Add(new SourceFile(saved));
+                compileResults = cpd.CompileAssemblyFromFile(compilerParameters,
+                                                                _extraSourceFilesCollection.ToList()
+                                                                                        .Select(s => s.FilePath)
+                                                                                        .ToArray());
+                
             }
 
 #if USE_INDICATOR
@@ -427,17 +429,32 @@ namespace ProtoPad_Client
                 }
                 
                 ShowLineError(codeLineNumber, error.ErrorText);
-                errorStringBuilder.AppendFormat("Error on File [{0}] line {1}: {2} \r\n", error.FileName, codeLineNumber, error.ErrorText);
+                errorStringBuilder.AppendFormat("Error on File <i>{0}</i> line <b>{1}</b>: <font color='red'>{2}</font> <br /><br />", error.FileName, codeLineNumber, error.ErrorText);
             }
-            if (!String.IsNullOrWhiteSpace(errorStringBuilder.ToString())) _htmlHolder.innerHTML = errorStringBuilder.ToString();
-            return compileResults.Errors.Count > 0 ? null : compilerParameters.OutputAssembly;
+            if (!String.IsNullOrWhiteSpace(errorStringBuilder.ToString())) 
+                _htmlHolder.innerHTML = errorStringBuilder.ToString();
+            else {
+                _htmlHolder.innerHTML = String.Format("Compiled{0} successfully!", 
+                    specialNonEditorCode != null || (!SourceMode && _extraSourceFilesCollection.Count == 0) ? "" : " " + _extraSourceFilesCollection.Count + "files" );
+            }
+            //return compileResults.Errors.Count > 0 ? null : compilerParameters.OutputAssembly;
+            if (compileResults.Errors.Count > 0) return null;
+            if (addResultToReference)
+                _projectAssembly.AssemblyReferences.AddFrom(compilerParameters.OutputAssembly);
+            return compilerParameters.OutputAssembly;
         }
 
-        private string SaveProtoPadSource() {
-            var savePath = CodeEditor.Document.FileName;
-            CodeEditor.Document.SaveFile(savePath, Encoding.UTF8, LineTerminator.CarriageReturnNewline); 
-            if (!SourceMode) {
-                var sourceCode = (WrapHeader + File.ReadAllText(savePath) + WrapFooter).Replace("void Main(", "public void Main(");
+        private string SaveEditorSource() {
+            var codeType = Enum.GetName(_currentCodeType.CodeType.GetType(), _currentCodeType.CodeType);
+            var savePath = CodeEditor.Document.FileName + "." + codeType;
+            if (_workingProject != null) {
+                savePath = Path.Combine(_workingProject.ProjectPath, savePath);
+            }
+
+            if (SourceMode)
+                CodeEditor.Document.SaveFile(savePath, Encoding.UTF8, LineTerminator.CarriageReturnNewline); 
+            else if (_currentCodeType.CodeType != CodeTypes.PixateCssFile) {
+                var sourceCode = (WrapHeader + CodeEditor.Document.CurrentSnapshot.Text + WrapFooter).Replace("void Main(", "public void Main(");
                 File.WriteAllText(savePath, sourceCode);
             }
             return savePath;
@@ -683,12 +700,81 @@ namespace ProtoPad_Client
                 }).Start();
         }
 
-
+        #region DataBinding Support
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName) {
             PropertyChangedEventHandler handler = PropertyChanged;
             if (handler != null) handler(this, new PropertyChangedEventArgs(propertyName));
+        }
+        #endregion
+
+        #region [Feature] Extra Source Files Support
+
+        private void CompileAllAndAddReferences()
+        {
+            var ifWrapDefaultCode = _currentCodeType.CodeType != CodeTypes.Source && _currentCodeType.CodeType != CodeTypes.Source;
+            var assembly = CompileSource(ifWrapDefaultCode);
+            if (assembly != null)
+            {
+                _projectAssembly.AssemblyReferences.AddFrom(assembly);
+            }
+        }
+       
+        public class SourceFile
+        {
+            public SourceFile(string path) {
+                FileName = Path.GetFileName(path);
+                FilePath = Path.GetFullPath(path);
+            }
+            public string FileName { get; set; }
+            public string FilePath { get; set; }
+        }
+
+        private ObservableCollection<SourceFile> _extraSourceFilesCollection = new ObservableCollection<SourceFile>();
+        public ObservableCollection<SourceFile> ExtraSourceFilesCollection {
+            get {
+                return _extraSourceFilesCollection;
+            }
+        }
+
+        private void AddSourceFiles(string  filesOrFolder) {
+            if (filesOrFolder == null || filesOrFolder.Trim() == "") return;
+
+            var items = filesOrFolder.Split(new[] { Environment.NewLine }, StringSplitOptions.RemoveEmptyEntries).ToList();
+            foreach ( var item in items ) {
+                if ( Directory.Exists(item) ) {
+                    foreach (var path in Directory.EnumerateFiles(item, "*.*", SearchOption.AllDirectories).Where(s => Path.GetExtension(s).ToLower() == ".cs")) {
+                        if (_extraSourceFilesCollection.Count(s => s.FilePath == path) <= 0) {
+                            _extraSourceFilesCollection.Add(new SourceFile(path));
+                        }
+                    }
+                } else if (File.Exists(item)) {
+                    if (_extraSourceFilesCollection.Count(s => s.FilePath == item) <= 0) {
+                        _extraSourceFilesCollection.Add(new SourceFile(item));
+                    }
+                }
+            }
+            if (_workingProject != null) {
+                var sb = new StringBuilder();
+                _extraSourceFilesCollection.ToList().ForEach(s=>sb.Append(s.FilePath).Append(Environment.NewLine));
+                _workingProject.SaveSourceList(sb.ToString());
+            }
+            CompileAllAndAddReferences();
+        }
+
+        private void RemoveSourceButton_Click(object sender, RoutedEventArgs e)
+        {
+            while (ExtraSourceListView.SelectedItems.Count>0) {
+                (ExtraSourceListView.ItemsSource as IList).Remove(ExtraSourceListView.SelectedItems[0]);
+            }
+            if (_workingProject != null)
+            {
+                var sb = new StringBuilder();
+                _extraSourceFilesCollection.ToList().ForEach(s => sb.Append(s.FilePath).Append(Environment.NewLine));
+                _workingProject.SaveSourceList(sb.ToString());
+            }
+            CompileAllAndAddReferences();
         }
 
         private void ExtraSourceFilesButton_Click(object sender, RoutedEventArgs e)
@@ -704,7 +790,7 @@ namespace ProtoPad_Client
             foreach (var fileName in dlg.FileNames) {
                 sb.Append(fileName).Append(Environment.NewLine);
             }
-            ExtraSourceFiles = ExtraSourceFiles + Environment.NewLine + sb;
+            AddSourceFiles(sb.ToString());
         }
 
         private void ExtraSourceFolderButton_Click(object sender, RoutedEventArgs e) {
@@ -713,10 +799,227 @@ namespace ProtoPad_Client
                 dlg.SelectedPath = AppDomain.CurrentDomain.BaseDirectory;
                 var result = dlg.ShowDialog();
                 if (result == System.Windows.Forms.DialogResult.OK) {
-                    var path = dlg.SelectedPath;
-                    ExtraSourceFiles = ExtraSourceFiles + Environment.NewLine + path;
+                    var folder = dlg.SelectedPath;
+                    AddSourceFiles(folder);
                 }
             }
         }
+
+        private void ExtraSourceListView_DoubleClick(object sender, MouseButtonEventArgs e) {
+            var source = ((ListViewItem) sender).Content as SourceFile;
+            Console.WriteLine("Double Clicked: " + source.FileName);
+            e.Handled = true;
+        }
+
+        
+        
+        #endregion
+
+        #region [Feature] Projects Support
+
+        private ProtoPadProject _workingProject;
+        private ObservableCollection<ProtoPadProject> _projectsCollection = new ObservableCollection<ProtoPadProject>();
+        public ObservableCollection<ProtoPadProject> ProjectsCollection
+        {
+            get
+            {
+                return _projectsCollection;
+            }
+        }
+
+        private void InitializeProjectList() {
+            var projectListString = ProtoPadConfig.LoadConfig(ProtoPadConfig.ConfigItemType.Projects);
+            if (projectListString == null || projectListString.Trim() == "")
+                return;
+            var projectList = projectListString.Split(new[] {'|'}, StringSplitOptions.RemoveEmptyEntries).ToList().Select(s=>new ProtoPadProject(s)).ToList();
+            if (projectList != null && projectList.Count()>0)
+                projectList.ForEach(p=>_projectsCollection.Add(p));
+        }
+
+        private void AddProject(string projectFolder)
+        {
+            if (projectFolder == null || projectFolder.Trim() == "") return;
+            if (!Directory.Exists(projectFolder)) return;
+
+            if (_projectsCollection.Count(s => s.ProjectPath == projectFolder) <= 0)
+                _projectsCollection.Add(new ProtoPadProject(projectFolder));
+
+            var sb = new StringBuilder();
+            _projectsCollection.ToList().ForEach(p => sb.Append(p.ProjectPath).Append("|"));
+            ProtoPadConfig.SaveConfig(ProtoPadConfig.ConfigItemType.Projects, sb.ToString());
+        }
+
+        private void RemoveProjectButton_Click(object sender, RoutedEventArgs e)
+        {
+            while (ProjectListView.SelectedItems.Count > 0){
+                (ProjectListView.ItemsSource as IList).Remove(ProjectListView.SelectedItems[0]);
+            }
+
+            var sb = new StringBuilder();
+            _projectsCollection.ToList().ForEach(p => sb.Append(p.ProjectPath).Append("|"));
+            ProtoPadConfig.SaveConfig(ProtoPadConfig.ConfigItemType.Projects, sb.ToString());
+        }
+
+        private void AddProjectButton_Click(object sender, RoutedEventArgs e)
+        {
+            using (var dlg = new System.Windows.Forms.FolderBrowserDialog())
+            {
+                dlg.SelectedPath = AppDomain.CurrentDomain.BaseDirectory;
+                var result = dlg.ShowDialog();
+                if (result == System.Windows.Forms.DialogResult.OK)
+                {
+                    var folder = dlg.SelectedPath;
+                    AddProject(folder);
+                }
+            }
+        }
+
+        private void SwitchToWorkingProject() {
+            ProtoPadConfig.SetWorkingProject(_workingProject);
+            _extraSourceFilesCollection.Clear();
+
+            if (_workingProject != null)
+            {
+                var sourceList = _workingProject.LoadSourceList();
+                AddSourceFiles(sourceList);
+            } else {
+                CompileAllAndAddReferences();
+            }
+            ExtraSourceTabItem.IsSelected = true;
+        }
+
+        private void ProjectListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ProjectListView.SelectedItems.Count <= 0) {
+                _workingProject = null;
+                SwitchToWorkingProject();
+            }
+        }
+
+        private void SwitchProjectButton_Click(object sender, RoutedEventArgs e) {
+            var project = ProjectListView.SelectedItem as ProtoPadProject;
+            if (project == null)
+                return;
+            _workingProject = project;
+            SwitchToWorkingProject();
+        }
+
+        private void ProjectListView_DoubleClick(object sender, MouseButtonEventArgs e) {
+            var clicking = ((ListViewItem)sender).Content as ProtoPadProject;
+            Console.WriteLine("Double Clicked: " + clicking.ProjectPath);
+            SwitchProjectButton_Click(sender, null);
+            e.Handled = true;
+        }
+
+        #endregion
+        
     }
+  
+    public class ProtoPadProject {
+        private const string kConfigFolderName = ".protopad";
+        private const string kIniFilename = "project.ini";
+        private const string kSourceListFileName = "sourcelist";
+
+        private string _configFolder;
+
+        public ProtoPadProject(string path) {
+            ProjectName = new DirectoryInfo(path).Name;
+            ProjectPath = path;
+            _configFolder = Path.Combine(ProjectPath, kConfigFolderName);
+            if (!Directory.Exists(_configFolder)) Directory.CreateDirectory(_configFolder);
+        }
+
+        public string ProjectName { get; set; }
+        public string ProjectPath { get; set; }
+
+        public string Ini {
+            get {
+                var iniFullPath = Path.Combine(_configFolder, kIniFilename);
+                return iniFullPath;
+            }
+        }
+
+        public void SaveSourceList(string sourceList) {
+            var file = Path.Combine(_configFolder, kSourceListFileName);
+            File.WriteAllText(file, sourceList);
+        }
+
+        public string LoadSourceList() {
+            var file = Path.Combine(_configFolder, kSourceListFileName);
+            if (File.Exists(file))
+                return File.ReadAllText(file);
+            return "";
+        }
+    }
+    
+    public static class ProtoPadConfig {
+        public enum ConfigItemType
+        {
+            IP,
+            PORT,
+            Projects,
+        }
+
+        private const string kProtoPadConfigFile = "protopad.ini";
+        private const string kSectionConnect = "Connect";
+        private const string kSectionProjects  = "Projects";
+
+        private static IniFile _protoPadIni = new IniFile(kProtoPadConfigFile);
+        private static ProtoPadProject _project;
+        private static IniFile _projectIni;
+        
+        public static void SetWorkingProject(ProtoPadProject p) {
+            _project = p;
+            if (_project != null)
+                _projectIni = new IniFile(_project.Ini);
+        }
+
+        private static IniFile GetActiveIniFile(ConfigItemType itemType) 
+        {
+            switch (itemType)
+            {   
+                // Project Level
+                case ConfigItemType.IP:
+                case ConfigItemType.PORT:
+                    return (_project != null) ? _projectIni : _protoPadIni;
+            }
+            // Global Level
+            return _protoPadIni;
+        }
+
+        public static void SaveConfig(ConfigItemType itemType, string value)
+        {
+            // todo: save to project folder if project setuped
+            string section, key;
+            GetSectionAndKey(itemType, out section, out key);
+
+            var ini = GetActiveIniFile(itemType);
+            ini.SetValue(section, key, value);
+            ini.Save();
+        }
+
+        public static string LoadConfig(ConfigItemType type)
+        {
+            // todo: load from poject folder if project setuped
+            string section, key;
+            GetSectionAndKey(type, out section, out key);
+            var ini = GetActiveIniFile(type);
+            return ini.GetValue(section, key);
+        }
+
+        private static void GetSectionAndKey(ConfigItemType itemType, out string section, out string key) {
+            section = "";
+            switch (itemType) {
+                case ConfigItemType.IP:
+                case ConfigItemType.PORT:
+                    section = kSectionConnect;
+                    break;
+                case ConfigItemType.Projects:
+                    section = kSectionProjects;
+                    break;
+            }
+            key = Enum.GetName(itemType.GetType(), itemType);
+        }
+    }
+
 }

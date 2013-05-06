@@ -94,9 +94,20 @@ namespace ServiceDiscovery
             request.Method = "POST";
             request.ContentLength = byteArray.Length;
             request.ContentType = "application/x-www-form-urlencoded";
-            var dataStream = request.GetRequestStream();
-            dataStream.Write(byteArray, 0, byteArray.Length);
-            dataStream.Close();
+
+            Stream dataStream = null;
+            try {
+                dataStream = request.GetRequestStream();
+                dataStream.Write(byteArray, 0, byteArray.Length);
+            }
+            catch (Exception) {
+                return null;
+            }
+            finally {
+                if (dataStream!=null)
+                    dataStream.Close();
+            } 
+            
             try
             {
                 var response = request.GetResponse();

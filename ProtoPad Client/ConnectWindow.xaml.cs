@@ -82,10 +82,17 @@ namespace ProtoPad_Client
             _dispatcherTimer.Start();
         }
 
-        private void AddManualIPButton_Click(object sender, RoutedEventArgs e)
-        {
+        private void AddManualIPButton_Click(object sender, RoutedEventArgs e) {
+            
             var promptWindow = new PromptIPAddressWindow();
+            promptWindow.IPAddressTextBox.Text = ProtoPadConfig.LoadConfig(ProtoPadConfig.ConfigItemType.IP);
+            promptWindow.PortTextBox.Text = ProtoPadConfig.LoadConfig(ProtoPadConfig.ConfigItemType.PORT);
+            
             if (!promptWindow.ShowDialog().Value) return;
+
+            ProtoPadConfig.SaveConfig(ProtoPadConfig.ConfigItemType.IP, promptWindow.IPAddressTextBox.Text);
+            ProtoPadConfig.SaveConfig(ProtoPadConfig.ConfigItemType.PORT, promptWindow.PortTextBox.Text);
+
             var address = String.Format("http://{0}:{1}", promptWindow.IPAddressTextBox.Text, promptWindow.PortTextBox.Text);
             var deviceType = QuickConnect(address);
             if (!deviceType.HasValue)
