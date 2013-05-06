@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:syntaxeditor="http://schemas.actiprosoftware.com/winfx/xaml/syntaxeditor"
         x:Class="ProtoPad_Client.MainWindow" Title="ProtoPad - NOT connected!" Height="800" Width="1024" Loaded="Window_Loaded"
+        DataContext="{Binding RelativeSource={RelativeSource Self}}"
         x:Name="ProtoPadWindow">
 
     <Grid>
@@ -43,26 +44,80 @@
             </DockPanel>
             <GridSplitter Width ="5" VerticalAlignment="Stretch" HorizontalAlignment="Right"></GridSplitter>
             <DockPanel Grid.Column="1">
-                <TabControl  Name="tabControl1" >
-                    <TabItem Header="Using..." Name="tabItem1">
+                <TabControl  x:Name="SidebarTabControl" >
+                    <TabItem Header ="Projects" x:Name="ProjectsTabItem">
                         <Grid>
-                            <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-                            <TextBox Grid.Row="0" x:Name="DefaultUsingTextBox" Text="{Binding ElementName=ProtoPadWindow, Path=DefaultUsingStatements, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" AcceptsReturn="True" IsReadOnly="true" VerticalScrollBarVisibility="Auto" Background="#FFE8E8E8" FontFamily="Consolas" />
-                            <GridSplitter HorizontalAlignment="Stretch" Height="2" VerticalAlignment="Bottom"/>
-                            <TextBox Grid.Row="1" x:Name="ExtraUsingTextBox" Text="{Binding ElementName=ProtoPadWindow, Path=ExtraUsingStatements, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" AcceptsReturn="True" IsReadOnly="False" VerticalScrollBarVisibility="Auto"  FontFamily="Consolas" />
-                        </Grid>
-                        
-                    </TabItem>
-                    <TabItem Header="Extra Source Files" Name="tabItem2">
-                        <Grid>
-                            <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height ="40"/></Grid.RowDefinitions>
-                            <TextBox Grid.Row="0" x:Name="ExtraSouceTextBox" Text="{Binding ElementName=ProtoPadWindow, Path=ExtraSourceFiles, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"  FontFamily="Consolas" />
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height ="40"/>
+                            </Grid.RowDefinitions>
+                            <Grid.Resources>
+                                <Style x:Key="itemStyle" TargetType ="{x:Type ListViewItem}">
+                                    <EventSetter Event = "MouseDoubleClick" Handler="ProjectListView_DoubleClick"></EventSetter>
+                                </Style>
+                            </Grid.Resources>
+
+                            <ListView x:Name="ProjectListView" Grid.Row="0" ItemsSource="{Binding ProjectsCollection}" SelectionChanged="ProjectListView_SelectionChanged" SelectionMode="Single" ItemContainerStyle="{StaticResource itemStyle}">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Width="200" Header="Project Name" DisplayMemberBinding="{Binding ProjectName}"  />
+                                        <GridViewColumn Header="Path" DisplayMemberBinding="{Binding ProjectPath}" />
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
                             <Grid Grid.Row="1">
-                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
-                                <Button x:Name="ExtraSourceFilesButton" Grid.Column ="0" Content="Extra Sources Files..." Click="ExtraSourceFilesButton_Click" />
-                                <Button x:Name="ExtraSourceFolderButton" Grid.Column ="1" Content="Extra Sources Folder..." Click="ExtraSourceFolderButton_Click" />
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="AddProjectButton" Grid.Column ="0" Content="Add Project Folder" Click="AddProjectButton_Click" />
+                                <Button x:Name="RemoveProjectButton" Grid.Column ="1" Content="Remove Project" Click="RemoveProjectButton_Click" />
+                                <Button x:Name="SwitchProjectButton" Grid.Column ="2" Content="Switch to selected Project" Click="SwitchProjectButton_Click" />
                             </Grid>
                         </Grid>
+                    </TabItem>
+                    <TabItem Header="Extra Source Files" x:Name="ExtraSourceTabItem">
+                        <Grid>
+                            <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height ="40"/></Grid.RowDefinitions>
+                            <Grid.Resources>
+                                <Style x:Key="itemStyle" TargetType ="{x:Type ListViewItem}">
+                                    <EventSetter Event = "MouseDoubleClick" Handler="ExtraSourceListView_DoubleClick"></EventSetter>
+                                </Style>
+                            </Grid.Resources>
+                            <ListView x:Name="ExtraSourceListView" Grid.Row="0" ItemsSource="{Binding ExtraSourceFilesCollection}" ItemContainerStyle="{StaticResource itemStyle}">
+                                
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Width="200" Header="File Name" DisplayMemberBinding="{Binding FileName}"  />
+                                        <GridViewColumn Header="Path" DisplayMemberBinding="{Binding FilePath}" />
+                                    </GridView>
+                                </ListView.View>
+                                
+                            </ListView>
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="ExtraSourceFilesButton" Grid.Column ="0" Content="Extra Sources Files..." Click="ExtraSourceFilesButton_Click" />
+                                <Button x:Name="ExtraSourceFolderButton" Grid.Column ="1" Content="Extra Sources Folder..." Click="ExtraSourceFolderButton_Click" />
+                                <Button x:Name="RemoveSourceButton" Grid.Column ="2" Content="Remove" Click="RemoveSourceButton_Click" />
+                            </Grid>
+                        </Grid>
+                    </TabItem>
+                    <TabItem Header="Using..." Name="tabItem1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                            </Grid.RowDefinitions>
+                            <TextBox Grid.Row="0" x:Name="DefaultUsingTextBox" Text="{Binding Path=DefaultUsingStatements, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" AcceptsReturn="True" IsReadOnly="true" VerticalScrollBarVisibility="Auto" Background="#FFE8E8E8" FontFamily="Consolas" />
+                            <GridSplitter HorizontalAlignment="Stretch" Height="2" VerticalAlignment="Bottom"/>
+                            <TextBox Grid.Row="1" x:Name="ExtraUsingTextBox" Text="{Binding Path=ExtraUsingStatements, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" AcceptsReturn="True" IsReadOnly="False" VerticalScrollBarVisibility="Auto"  FontFamily="Consolas" />
+                        </Grid>
+
                     </TabItem>
                 </TabControl>
             </DockPanel>
