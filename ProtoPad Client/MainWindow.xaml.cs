@@ -68,6 +68,7 @@ namespace ProtoPad_Client
                 }
             }
         }
+
         private List<string> ExtraUsingStatementsList 
         {
             get {
@@ -111,11 +112,26 @@ namespace ProtoPad_Client
                     _extraSourceFilesList.ForEach((s) => { sb.Append(s).Append(Environment.NewLine); });
                     _extraSourceFiles = sb.ToString();
                     OnPropertyChanged("ExtraSourceFiles");
+
+                    CompileAllAndAddReferences();
                 }
             }
         }
+
+        private void CompileAllAndAddReferences() {
+            var ifWrapDefaultCode = _currentCodeType.CodeType != CodeTypes.Source;
+            var assembly = CompileSource(ifWrapDefaultCode);
+            if (assembly != null) {
+                _projectAssembly.AssemblyReferences.AddFrom(assembly);
+            }
+        }
+
         private List<string> _extraSourceFilesList = new List<string>();
-        
+
+        private bool SourceMode { get {return _currentCodeType.CodeType == CodeTypes.Source;} }
+
+        private bool LocalMode { get {return _currentDevice.DeviceType == DeviceTypes.Local;} }
+
         private string WrapHeader
         {
             get { return _currentWrapText.Split(new[] { EditorHelpers.CodeTemplateStatementsPlaceHolder }, StringSplitOptions.None)[0]; }
@@ -125,7 +141,6 @@ namespace ProtoPad_Client
             get { return _currentWrapText.Split(new[] { EditorHelpers.CodeTemplateStatementsPlaceHolder }, StringSplitOptions.None)[1]; }
         }
 
-       
 
         public enum DeviceTypes {Android, iOS, Local}
 
@@ -188,10 +203,8 @@ namespace ProtoPad_Client
        
 
         private void SendCodeButton_Click(object sender, RoutedEventArgs e) {
-            var sourceMode = _currentCodeType.CodeType == CodeTypes.Source;
-            if (sourceMode)
-                CodeEditor.Document.SaveFile(CodeEditor.Document.FileName, Encoding.UTF8, LineTerminator.CarriageReturnNewline);
-            var wrapDefault = !sourceMode ;
+            
+            var wrapDefault = !SourceMode ;
             var result = SendCode(_currentDevice.DeviceAddress, wrapDefault);
             if (result == null) return;
             var errorMessage = result.ErrorMessage;
@@ -262,7 +275,8 @@ namespace ProtoPad_Client
             var assemblyPath = dlg.FileName;
             _projectAssembly.AssemblyReferences.AddFrom(assemblyPath);
             _referencedAssemblies.Add(assemblyPath);
-            SimpleHttpServer.SendPostRequest(_currentDevice.DeviceAddress, File.ReadAllBytes(assemblyPath), "ExecuteAssembly");
+            if (!LocalMode)
+                SimpleHttpServer.SendPostRequest(_currentDevice.DeviceAddress, File.ReadAllBytes(assemblyPath), "ExecuteAssembly");
         }
 
         private void CodeTypeComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -272,6 +286,8 @@ namespace ProtoPad_Client
             {
                 _currentCodeType = newCodeType;
                 SetText(true);
+                if (_extraSourceFilesList.Count > 0)
+                    CompileAllAndAddReferences();
             }
             UpdateSendButtons();
         }
@@ -387,17 +403,18 @@ namespace ProtoPad_Client
 
             compilerParameters.GenerateExecutable = false;
 
-            var sourceMode = _currentCodeType.CodeType == CodeTypes.Source;
             CompilerResults compileResults;
-            if (sourceMode && specialNonEditorCode==null)
-            {
-                if (!_extraSourceFilesList.Contains(CodeEditor.Document.FileName))
-                    _extraSourceFilesList.Add(CodeEditor.Document.FileName);
-                compileResults = cpd.CompileAssemblyFromFile(compilerParameters, _extraSourceFilesList.ToArray());
-            } else {
+
+            if (specialNonEditorCode != null || (!SourceMode && _extraSourceFilesList.Count == 0)) {
                 compileResults = cpd.CompileAssemblyFromSource(compilerParameters, sourceCode);
+            } else {
+                var saved = SaveProtoPadSource();
+                if (!_extraSourceFilesList.Contains(saved))
+                    _extraSourceFilesList.Add(saved);
+                compileResults = cpd.CompileAssemblyFromFile(compilerParameters, _extraSourceFilesList.ToArray());
             }
-            
+
+
             CodeEditor.Document.IndicatorManager.Clear<ErrorIndicatorTagger, ErrorIndicatorTag>();
             var errorStringBuilder = new StringBuilder();
             foreach (CompilerError error in compileResults.Errors) {
@@ -414,6 +431,16 @@ namespace ProtoPad_Client
             return compileResults.Errors.Count > 0 ? null : compilerParameters.OutputAssembly;
         }
 
+        private string SaveProtoPadSource() {
+            var savePath = CodeEditor.Document.FileName;
+            CodeEditor.Document.SaveFile(savePath, Encoding.UTF8, LineTerminator.CarriageReturnNewline); 
+            if (!SourceMode) {
+                var sourceCode = (WrapHeader + File.ReadAllText(savePath) + WrapFooter).Replace("void Main(", "public void Main(");
+                File.WriteAllText(savePath, sourceCode);
+            }
+            return savePath;
+        }
+
         private void ShowLineError(int codeLineNumber, string errorMessage)
         {
             if (codeLineNumber < 0 || codeLineNumber >= CodeEditor.ActiveView.CurrentSnapshot.Lines.Count) codeLineNumber = 0;
@@ -423,7 +450,6 @@ namespace ProtoPad_Client
 
             var tag = new ErrorIndicatorTag { ContentProvider = new PlainTextContentProvider(errorMessage) };
             CodeEditor.Document.IndicatorManager.Add<ErrorIndicatorTagger, ErrorIndicatorTag>(CodeEditor.ActiveView.Selection.SnapshotRange, tag);
-
         }
 
         private void UpdateCodeTypesComboBox()
@@ -551,7 +577,7 @@ namespace ProtoPad_Client
             ResultTextBox.NavigateToString(Properties.Resources.ResultHtmlWrap);
         }
 
-       private void InitializeEditor()
+        private void InitializeEditor()
         {
             //UpdateEditorLanguage(_currentCodeType.CodeType, false);
 
@@ -626,7 +652,6 @@ namespace ProtoPad_Client
         }
 
         private readonly Dictionary<string, IProjectAssemblyReference> cachedReferences = new Dictionary<string, IProjectAssemblyReference>();
-        
 
         private void LoadEditorReferences()
         {            
