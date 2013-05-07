@@ -219,11 +219,7 @@ namespace ProtoPad_Client
 {
     " + sampleStatements + @"
 }";
-                case MainWindow.CodeTypes.Source:
-                    return @"public void Main(" + GetDeviceSpecificMainParams(deviceType) + @")
-    {
-    
-    }";
+                
 // Define other methods and classes here";
                 case MainWindow.CodeTypes.Expression:
                     return "";

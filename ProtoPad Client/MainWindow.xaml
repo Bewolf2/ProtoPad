@@ -33,8 +33,8 @@
         
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition/>
-                <ColumnDefinition/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="200"/>
             </Grid.ColumnDefinitions>
             <DockPanel Grid.Column="0" >
                 <!--<syntaxeditor:SyntaxEditor DockPanel.Dock="Bottom" x:Name="CodeEditor" IsIndicatorMarginVisible="True">-->
@@ -71,13 +71,13 @@
                                     <ColumnDefinition/>
                                     <ColumnDefinition/>
                                 </Grid.ColumnDefinitions>
-                                <Button x:Name="AddProjectButton" Grid.Column ="0" Content="Add Project Folder" Click="AddProjectButton_Click" />
-                                <Button x:Name="RemoveProjectButton" Grid.Column ="1" Content="Remove Project" Click="RemoveProjectButton_Click" />
-                                <Button x:Name="SwitchProjectButton" Grid.Column ="2" Content="Switch to selected Project" Click="SwitchProjectButton_Click" />
+                                <Button x:Name="AddProjectButton" Grid.Column ="0" Content="Add" Click="AddProjectButton_Click" />
+                                <Button x:Name="RemoveProjectButton" Grid.Column ="1" Content="Remove" Click="RemoveProjectButton_Click" />
+                                <Button x:Name="SwitchProjectButton" Grid.Column ="2" Content="Switch To" Click="SwitchProjectButton_Click" />
                             </Grid>
                         </Grid>
                     </TabItem>
-                    <TabItem Header="Extra Source Files" x:Name="ExtraSourceTabItem">
+                    <TabItem Header="Sources" x:Name="ExtraSourceTabItem">
                         <Grid>
                             <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height ="40"/></Grid.RowDefinitions>
                             <Grid.Resources>
@@ -101,13 +101,47 @@
                                     <ColumnDefinition/>
                                     <ColumnDefinition/>
                                 </Grid.ColumnDefinitions>
-                                <Button x:Name="ExtraSourceFilesButton" Grid.Column ="0" Content="Extra Sources Files..." Click="ExtraSourceFilesButton_Click" />
-                                <Button x:Name="ExtraSourceFolderButton" Grid.Column ="1" Content="Extra Sources Folder..." Click="ExtraSourceFolderButton_Click" />
+                                <Button x:Name="ExtraSourceFilesButton" Grid.Column ="0" Content="Add Files" Click="ExtraSourceFilesButton_Click" />
+                                <Button x:Name="ExtraSourceFolderButton" Grid.Column ="1" Content="Add Folder..." Click="ExtraSourceFolderButton_Click" />
                                 <Button x:Name="RemoveSourceButton" Grid.Column ="2" Content="Remove" Click="RemoveSourceButton_Click" />
                             </Grid>
                         </Grid>
                     </TabItem>
-                    <TabItem Header="Using..." Name="tabItem1">
+                    
+                    <TabItem Header ="References" x:Name="ReferencesTabItem">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height ="40"/>
+                            </Grid.RowDefinitions>
+                            <Grid.Resources>
+                                <Style x:Key="itemStyle" TargetType ="{x:Type ListViewItem}">
+                                    <EventSetter Event = "MouseDoubleClick" Handler="ReferenceListView_DoubleClick"></EventSetter>
+                                </Style>
+                            </Grid.Resources>
+
+                            <ListView x:Name="ReferenceListView" Grid.Row="0" ItemsSource="{Binding ReferencesCollection}" SelectionMode="Single" ItemContainerStyle="{StaticResource itemStyle}">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn Width="60" Header="Loaded?" DisplayMemberBinding="{Binding Loaded}"  />
+                                        <GridViewColumn Width="200" Header="Reference Name" DisplayMemberBinding="{Binding ReferenceName}"  />
+                                        <GridViewColumn Width="200" Header="Assembly Name" DisplayMemberBinding="{Binding AssemblyName}"  />
+                                        <GridViewColumn Header="Path" DisplayMemberBinding="{Binding ReferencePath}" />
+                                    </GridView>
+                                </ListView.View>
+                            </ListView>
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="AddReferenceButton" Grid.Column ="0" Content="Add" Click="AddReferenceButton_Click" />
+                                <Button x:Name="RemoveReferenceButton" Grid.Column ="1" Content="Remove" Click="RemoveReferenceButton_Click" />
+                            </Grid>
+                        </Grid>
+                    </TabItem>
+                    
+                    <TabItem Header="Using" Name="tabItem1">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition/>
