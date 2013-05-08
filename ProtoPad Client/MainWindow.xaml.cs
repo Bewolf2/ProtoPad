@@ -250,7 +250,7 @@ namespace ProtoPad_Client
         {
             var newCodeType = CodeTypeComboBox.SelectedItem as CodeTypeItem;
             if (newCodeType != _currentCodeType && newCodeType != null) {
-                // Todo: save old cs/css file for load back later
+                
                 if (_currentCodeType.CodeType != CodeTypes.PixateCssFile) {
                     SaveEditorSource();
                     SavedExtraUsingSource(_currentCodeType.CodeType);
@@ -258,11 +258,6 @@ namespace ProtoPad_Client
 
                 _currentCodeType = newCodeType;
                 SetText(true);
-
-                /*
-                if (newCodeType.CodeType != CodeTypes.PixateCssFile && _extraSourceFilesCollection.Count > 0)
-                    CompileAndAddReferences();
-                */
             }
             UpdateSendButtons();
         }
@@ -624,6 +619,12 @@ namespace ProtoPad_Client
                     _msCorLib = null;
                     _referencedAssemblies = EditorHelpers.GetRegularDotNetBaseAssemblyNames();
                     break;
+            }
+
+            var referenceList = _referencesCollection.Where(r=>r.Loaded).Select(r=>r.ReferencePath).ToList();
+            foreach (var reference in referenceList) {
+                if (!_referencedAssemblies.Contains(reference))
+                    _referencedAssemblies.Add(reference);
             }
         }
 
@@ -1075,27 +1076,25 @@ namespace ProtoPad_Client
         }
 
         private void UnLoadReference(ProtoPadReference aReference) {
-            var found =
-                _projectAssembly.AssemblyReferences.ToList()
-                                .Where(a => a.AssemblyName.FullName == aReference.AssemblyName)
-                                .ToList();
-            if (found.Count > 0)
+            /*var found = _projectAssembly.AssemblyReferences.ToList().Where(a => a.AssemblyName.FullName == aReference.AssemblyName).ToList();
+            if ( found.Count > 0 )
                 found.ForEach(a => _projectAssembly.AssemblyReferences.Remove(a));
-
+            */
             if (_referencedAssemblies.Contains(aReference.ReferencePath)) {
                 _referencedAssemblies.Remove(aReference.ReferencePath);
             }
+            LoadEditorReferences();
             aReference.Loaded = false;
         }
 
         private void LoadReference(ProtoPadReference aReference) {
-            _projectAssembly.AssemblyReferences.AddFrom(aReference.ReferencePath);
+            //_projectAssembly.AssemblyReferences.AddFrom(aReference.ReferencePath);
             if (!_referencedAssemblies.Contains(aReference.ReferencePath)) {
                 _referencedAssemblies.Add(aReference.ReferencePath);
             }
+            LoadEditorReferences();
             if (!LocalMode)
-                SimpleHttpServer.SendPostRequest(_currentDevice.DeviceAddress, File.ReadAllBytes(assemblyPath),
-                                                 "ExecuteAssembly");
+                SimpleHttpServer.SendPostRequest(_currentDevice.DeviceAddress, File.ReadAllBytes(aReference.ReferencePath),"ExecuteAssembly");
 
             aReference.Loaded = true;
         }
