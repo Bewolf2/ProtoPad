@@ -134,9 +134,11 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition/>
                                     <ColumnDefinition/>
+                                    <ColumnDefinition/>
                                 </Grid.ColumnDefinitions>
-                                <Button x:Name="AddReferenceButton" Grid.Column ="0" Content="Add" Click="AddReferenceButton_Click" />
-                                <Button x:Name="RemoveReferenceButton" Grid.Column ="1" Content="Remove" Click="RemoveReferenceButton_Click" />
+                                <Button x:Name="ReloadAllReferenceButton" Grid.Column ="0" Content="ReloadALl" Click="ReloadAllReferenceButton_Click" />
+                                <Button x:Name="AddReferenceButton" Grid.Column ="1" Content="Add" Click="AddReferenceButton_Click" />
+                                <Button x:Name="RemoveReferenceButton" Grid.Column ="2" Content="Remove" Click="RemoveReferenceButton_Click" />
                             </Grid>
                         </Grid>
                     </TabItem>

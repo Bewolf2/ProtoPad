@@ -36,7 +36,7 @@ namespace ProtoPad_Client
         private IHTMLElement _htmlHolder;
         private IHTMLWindow2 _htmlWindow;
         private string _currentWrapText;
-        private IProjectAssembly _projectAssembly;
+        private IProjectAssembly _projectAssembly;           
 
         private List<string> _referencedAssemblies = new List<string>();
         private string _msCorLib;
@@ -260,6 +260,8 @@ namespace ProtoPad_Client
                 SetText(true);
             }
             UpdateSendButtons();
+
+            CompileAndAddReferences();
         }
 
         private void ClearSimulatorWindowButton_Click(object sender, RoutedEventArgs e)
@@ -290,6 +292,7 @@ namespace ProtoPad_Client
         private ExecuteResponse SendCode(string url, bool wrapWithDefaultCode = true, string specialNonEditorCode = null) {
             var assemblyPath = CompileSource(wrapWithDefaultCode, specialNonEditorCode);
             if (String.IsNullOrWhiteSpace(assemblyPath)) return null;
+            _projectAssembly.AssemblyReferences.AddFrom(assemblyPath);
             if (_currentDevice.DeviceType == DeviceTypes.Local) {
                 var executeResponse = EditorHelpers.ExecuteLoadedAssemblyString(File.ReadAllBytes(assemblyPath));
                 var dumpValues = executeResponse.GetDumpValues();
@@ -334,6 +337,7 @@ namespace ProtoPad_Client
         private string GetSourceWithOffsetRegistrationStatements()
         {
             var parseData = CodeEditor.Document.ParseData as IDotNetParseData;
+            if (parseData == null) return "";
 
             var statementOffsets = new List<int>();
             VisitNodesAndSelectStatementOffsets(parseData.Ast, statementOffsets);
@@ -380,9 +384,7 @@ namespace ProtoPad_Client
                 if (_extraSourceFilesCollection.Count > 0) 
                 {
                     var result = CompileSource(false);
-                    if (result != null) {
-                        _projectAssembly.AssemblyReferences.AddFrom(result);
-                    }
+                    if (result != null) _projectAssembly.AssemblyReferences.AddFrom(result);
                 }   
             } else 
             {
@@ -395,16 +397,20 @@ namespace ProtoPad_Client
             CodeEditor.Document.IndicatorManager.Clear<ErrorIndicatorTagger, ErrorIndicatorTag>();
             var errorStringBuilder = new StringBuilder();
             foreach (CompilerError error in compileResults.Errors) {
-                var startLines = WrapHeader.Split('\n').Length;
-                var codeLineNumber =  error.Line - startLines;     
-                
+
+                int codeLineNumber = error.Line;
+                if ( Path.GetFileName(error.FileName) == GetEditorSourceFileName(true)) {
+                    var startLines = WrapHeader.Split('\n').Length;
+                    codeLineNumber = error.Line - startLines;     
+                }
+
                 ShowLineError(codeLineNumber, error.ErrorText);
                 errorStringBuilder.AppendFormat("Error on File <i>{0}</i> line <b>{1}</b>: <font color='red'>{2}</font> <br /><br />", error.FileName, codeLineNumber, error.ErrorText);
             }
-            if (!String.IsNullOrWhiteSpace(errorStringBuilder.ToString())) 
-                _htmlHolder.innerHTML = errorStringBuilder.ToString();
+            if (!String.IsNullOrWhiteSpace(errorStringBuilder.ToString()))
+                if (_htmlHolder != null) _htmlHolder.innerHTML = errorStringBuilder.ToString();
             else {
-                _htmlHolder.innerHTML = String.Format("Compiled{0} successfully!", (specialNonEditorCode != null || _extraSourceFilesCollection.Count == 0) ? "" : " " + _extraSourceFilesCollection.Count + " files" );
+                if (_htmlHolder != null) _htmlHolder.innerHTML = String.Format("Compiled{0} successfully!", (specialNonEditorCode != null || _extraSourceFilesCollection.Count == 0) ? "" : " " + _extraSourceFilesCollection.Count + " files");
             }
             //return compileResults.Errors.Count > 0 ? null : compilerParameters.OutputAssembly;
             if (compileResults.Errors.Count > 0) return null;
@@ -663,35 +669,40 @@ namespace ProtoPad_Client
         #endregion
 
         #region Save and Load
-        private string SaveEditorSource(bool forCompileOnly = false)
-        {
-
+        private string GetCodeTypeString(CodeTypes codeType) {
+            return Enum.GetName(codeType.GetType(), codeType);
+        }
+        private string GetEditorSourceFileName(bool forCompileOnly = false, string codeType=null) {
+            var localOrRemote = LocalMode ? ".local" : ".remote";
+            string filePath = "";
             if (forCompileOnly)
-            {
-                var tmpFile = CodeEditor.Document.FileName + ".tmp";
-                var sourceCode = (WrapHeader + CodeEditor.Document.CurrentSnapshot.Text + WrapFooter).Replace("void Main(", "public void Main(");
+                filePath = CodeEditor.Document.FileName + ".tmp" + localOrRemote;
+            else {
+                filePath = CodeEditor.Document.FileName + "." + codeType + localOrRemote;
+            }
+
+            if (_workingProject != null)
+                filePath = Path.Combine(_workingProject.ConfigFolderPathPath, filePath);
+
+            return filePath;
+        }
+
+        private string SaveEditorSource(bool forCompileOnly = false) {
+            if (forCompileOnly)
+            {   
+                var sourceCode = (WrapHeader + CodeEditor.Document.CurrentSnapshot.Text + WrapFooter).Replace("void Main(", "public void Main(");;
+                var tmpFile = GetEditorSourceFileName(true);
                 File.WriteAllText(tmpFile, sourceCode);
                 return tmpFile;
             }
 
-            var codeTypeString = Enum.GetName(_currentCodeType.CodeType.GetType(), _currentCodeType.CodeType);
-            var savePath = CodeEditor.Document.FileName + "." + codeTypeString;
-            if (_workingProject != null)
-            {
-                savePath = Path.Combine(_workingProject.ProjectPath, savePath);
-            }
+            var savePath = GetEditorSourceFileName(false, GetCodeTypeString(_currentCodeType.CodeType));
             CodeEditor.Document.SaveFile(savePath, Encoding.UTF8, LineTerminator.CarriageReturnNewline);
             return savePath;
         }
 
-        private string LoadSavedEditorSource(CodeTypes codeType)
-        {
-            var codeTypeString = Enum.GetName(_currentCodeType.CodeType.GetType(), _currentCodeType.CodeType);
-            var savePath = CodeEditor.Document.FileName + "." + codeTypeString;
-            if (_workingProject != null)
-            {
-                savePath = Path.Combine(_workingProject.ProjectPath, savePath);
-            }
+        private string LoadSavedEditorSource(CodeTypes codeType) {
+            var savePath = GetEditorSourceFileName(false,GetCodeTypeString(codeType));
             if (File.Exists(savePath))
             {
                 return File.ReadAllText(savePath);
@@ -786,7 +797,7 @@ namespace ProtoPad_Client
         private void CompileAndAddReferences()
         {
             var assembly = CompileSource(true);
-            if (assembly != null)
+            if (assembly != null && _projectAssembly != null)
             {
                 _projectAssembly.AssemblyReferences.AddFrom(assembly);
             }
@@ -1056,6 +1067,17 @@ namespace ProtoPad_Client
             SaveReferenceListToConfig();
         }
 
+        private void ReloadAllReferenceButton_Click(object sender, RoutedEventArgs e) {
+            foreach (var reference in _referencesCollection) {
+                if (reference.Loaded)
+                    UnLoadReference(reference);
+            }
+            foreach (var reference in _referencesCollection)
+            {
+                LoadReference(reference);
+            }
+        }
+
         private void SaveReferenceListToConfig()
         {
             var sb = new StringBuilder();
@@ -1076,27 +1098,36 @@ namespace ProtoPad_Client
         }
 
         private void UnLoadReference(ProtoPadReference aReference) {
-            /*var found = _projectAssembly.AssemblyReferences.ToList().Where(a => a.AssemblyName.FullName == aReference.AssemblyName).ToList();
-            if ( found.Count > 0 )
-                found.ForEach(a => _projectAssembly.AssemblyReferences.Remove(a));
-            */
-            if (_referencedAssemblies.Contains(aReference.ReferencePath)) {
-                _referencedAssemblies.Remove(aReference.ReferencePath);
-            }
-            LoadEditorReferences();
-            aReference.Loaded = false;
+
+            new Task(() =>
+            {
+                if (_referencedAssemblies.Contains(aReference.ReferencePath))
+                {
+                    _referencedAssemblies.Remove(aReference.ReferencePath);
+                }
+                LoadEditorReferences();
+                aReference.Loaded = false;
+                Dispatcher.Invoke((Action)(() => LogToResultsWindow("Unloading reference:" + aReference.ReferenceName)));
+
+            }).Start();
         }
 
         private void LoadReference(ProtoPadReference aReference) {
-            //_projectAssembly.AssemblyReferences.AddFrom(aReference.ReferencePath);
-            if (!_referencedAssemblies.Contains(aReference.ReferencePath)) {
-                _referencedAssemblies.Add(aReference.ReferencePath);
-            }
-            LoadEditorReferences();
-            if (!LocalMode)
-                SimpleHttpServer.SendPostRequest(_currentDevice.DeviceAddress, File.ReadAllBytes(aReference.ReferencePath),"ExecuteAssembly");
+            new Task(() =>
+            {
 
-            aReference.Loaded = true;
+                if (!_referencedAssemblies.Contains(aReference.ReferencePath)) {
+                    _referencedAssemblies.Add(aReference.ReferencePath);
+                }
+                LoadEditorReferences();
+                
+                if (!LocalMode)
+                    SimpleHttpServer.SendPostRequest(_currentDevice.DeviceAddress, File.ReadAllBytes(aReference.ReferencePath),"ExecuteAssembly");
+                
+                aReference.Loaded = true;
+                Dispatcher.Invoke((Action)(() => LogToResultsWindow("Loading reference:" + aReference.ReferenceName)));
+
+            }).Start();
         }
 
         #endregion
@@ -1107,14 +1138,17 @@ namespace ProtoPad_Client
         private const string kConfigFolderName = ".protopad";
         private const string kIniFilename = "project.ini";
 
-        private string _configFolder;
+        private string _configFolderPath;
+        public string ConfigFolderPathPath {
+            get { return _configFolderPath; }
+        }
 
         public ProtoPadProject(string path)
         {
             ProjectName = new DirectoryInfo(path).Name;
             ProjectPath = path;
-            _configFolder = Path.Combine(ProjectPath, kConfigFolderName);
-            if (!Directory.Exists(_configFolder)) Directory.CreateDirectory(_configFolder);
+            _configFolderPath = Path.Combine(ProjectPath, kConfigFolderName);
+            if (!Directory.Exists(_configFolderPath)) Directory.CreateDirectory(_configFolderPath);
         }
 
         public string ProjectName { get; set; }
@@ -1124,7 +1158,7 @@ namespace ProtoPad_Client
         {
             get
             {
-                var iniFullPath = Path.Combine(_configFolder, kIniFilename);
+                var iniFullPath = Path.Combine(_configFolderPath, kIniFilename);
                 return iniFullPath;
             }
         }
